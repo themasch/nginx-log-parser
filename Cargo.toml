@@ -1,0 +1,8 @@
+[package]
+name = "nginx-log-parser"
+version = "0.1.0"
+authors = ["Mark Schmale <m.schmale@uniorg.de>"]
+
+[dependencies]
+regex = "1.0.5"
+failure = "0.1.2"
