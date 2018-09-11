@@ -1,3 +1,5 @@
 /target
 **/*.rs.bk
 sample/
+nginx-log-parser.iml
+.idea/
