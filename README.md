@@ -1,4 +1,5 @@
-# nginx_log_parser
+# nginx_log_parser 
+> [![Build Status](https://travis-ci.org/themasch/nginx-log-parser.svg?branch=master)](https://travis-ci.org/themasch/nginx-log-parser)
 
 A rust library to read nginx log files.
 
