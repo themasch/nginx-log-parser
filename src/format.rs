@@ -1,4 +1,5 @@
 use regex::{escape, Captures, Error as RegexError, Regex};
+use std::str::FromStr;
 
 #[derive(Debug, Fail)]
 pub enum FormatParserError {
@@ -18,6 +19,7 @@ impl<'a> Entry<'a> {
     /// ```rust
     /// # extern crate nginx_log_parser;
     /// # use nginx_log_parser::Format;
+    /// # use std::str::FromStr;
     /// #
     /// let format = Format::from_str("$remote_addr [$time_local] $request").unwrap();
     /// let entry = format.parse("1.2.3.4 [11/Sep/2018:08:44:17 +0000] GET / HTTP/1.1").unwrap();
@@ -43,27 +45,13 @@ pub struct Format {
 
 impl Format {
     ///
-    /// Reads a format string in nginx-like syntax and creates a Format from it
-    ///
-    /// # Example
-    /// ```rust
-    /// # extern crate nginx_log_parser;
-    /// # use nginx_log_parser::Format;
-    /// #
-    /// let pattern = "$remote_addr [$time_local] $request";
-    /// let format = Format::from_str(pattern).expect("could not parse format string");
-    /// ```
-    pub fn from_str(input: &str) -> Result<Format, FormatParserError> {
-        read_format(input.as_bytes())
-    }
-
-    ///
     /// Reads an input line returning an optional `Entry` that contains the parsed result.
     ///
     /// # Example
     /// ```rust
     /// # extern crate nginx_log_parser;
     /// # use nginx_log_parser::Format;
+    /// # use std::str::FromStr;
     /// #
     /// let format = Format::from_str("$remote_addr [$time_local] $request").unwrap();
     /// let entry = format.parse("1.2.3.4 [11/Sep/2018:08:44:17 +0000] GET / HTTP/1.1");
@@ -76,6 +64,7 @@ impl Format {
     /// ```rust
     /// # extern crate nginx_log_parser;
     /// # use nginx_log_parser::Format;
+    /// # use std::str::FromStr;
     /// #
     /// let format = Format::from_str("$remote_addr [$time_local] $request").unwrap();
     /// assert!(format.parse("this does not work").is_none());
@@ -94,6 +83,26 @@ impl Format {
         };
 
         Ok(Format { parts, re })
+    }
+}
+
+impl FromStr for Format {
+    type Err = FormatParserError;
+
+    ///
+    /// Reads a format string in nginx-like syntax and creates a Format from it
+    ///
+    /// # Example
+    /// ```rust
+    /// # extern crate nginx_log_parser;
+    /// # use nginx_log_parser::Format;
+    /// # use std::str::FromStr;
+    /// #
+    /// let pattern = "$remote_addr [$time_local] $request";
+    /// let format = Format::from_str(pattern).expect("could not parse format string");
+    /// ```
+    fn from_str(input: &str) -> Result<Format, FormatParserError> {
+        read_format(input.as_bytes())
     }
 }
 
@@ -188,6 +197,7 @@ mod test {
     use format::Format;
     use format::FormatPart::Fixed;
     use format::FormatPart::Variable;
+    use std::str::FromStr;
 
     #[test]
     fn test_parse_format() {

@@ -1,6 +1,7 @@
 extern crate nginx_log_parser;
 
 use nginx_log_parser::Format;
+use std::str::FromStr;
 
 fn main() {
     let lines = vec![
