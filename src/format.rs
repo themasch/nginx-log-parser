@@ -1,5 +1,5 @@
 use regex::{escape, Captures, Error as RegexError, Regex};
-use std::str::FromStr;
+use std::str;
 
 #[derive(Debug, Fail)]
 pub enum FormatParserError {
@@ -38,12 +38,12 @@ impl<'a> Entry<'a> {
 #[derive(Debug)]
 /// Represents the parsed format of an nginx log line.
 /// Can be obtained by parsing an nginx log format string using `Format::from_str`.
-pub struct Format {
-    parts: Vec<FormatPart>,
+pub struct Format<'a> {
+    parts: Vec<FormatPart<'a>>,
     re: Regex,
 }
 
-impl Format {
+impl<'a> Format<'a> {
     ///
     /// Reads an input line returning an optional `Entry` that contains the parsed result.
     ///
@@ -69,7 +69,7 @@ impl Format {
     /// let format = Format::from_str("$remote_addr [$time_local] $request").unwrap();
     /// assert!(format.parse("this does not work").is_none());
     /// ```
-    pub fn parse<'a>(&self, line: &'a str) -> Option<Entry<'a>> {
+    pub fn parse<'b>(&self, line: &'b str) -> Option<Entry<'b>> {
         // TODO: i do not want to use regex here but i'm not smart enough to write my own parser
         self.re.captures(line).map(|captures| Entry { captures })
     }
@@ -84,48 +84,32 @@ impl Format {
 
         Ok(Format { parts, re })
     }
-}
 
-impl FromStr for Format {
-    type Err = FormatParserError;
-
-    ///
-    /// Reads a format string in nginx-like syntax and creates a Format from it
-    ///
-    /// # Example
-    /// ```rust
-    /// # extern crate nginx_log_parser;
-    /// # use nginx_log_parser::Format;
-    /// # use std::str::FromStr;
-    /// #
-    /// let pattern = "$remote_addr [$time_local] $request";
-    /// let format = Format::from_str(pattern).expect("could not parse format string");
-    /// ```
-    fn from_str(input: &str) -> Result<Format, FormatParserError> {
+    pub fn new(input: &str) -> Result<Format, FormatParserError> {
         read_format(input.as_bytes())
     }
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum FormatPart {
-    Variable(String),
-    Fixed(String),
+pub enum FormatPart<'a> {
+    Variable(&'a str),
+    Fixed(&'a str),
 }
 
-impl FormatPart {
+impl<'a> FormatPart<'a> {
     fn get_pattern(&self) -> String {
         use self::FormatPart::*;
         match self {
             Variable(name) => format!(
                 "(?P<{}>{})",
                 name.trim_left_matches('$'),
-                match name.as_str() {
+                match *name {
                     "$status" => "\\d{3}",
                     "$body_bytes_sent" => "\\d+",
                     _ => ".*",
                 }
             ),
-            Fixed(fixed_part) => escape(&fixed_part),
+            Fixed(fixed_part) => escape(fixed_part),
         }
     }
 }
@@ -165,29 +149,31 @@ fn read_format(bytes: &[u8]) -> Result<Format, FormatParserError> {
     use format::FormatParserState::*;
     let mut state = Start;
     let mut stack = vec![];
-    for i in 0..bytes.len() {
-        let new_state = read_byte(&bytes[i], i, &state);
-        match (&state, &new_state) {
-            (Variable(start, end), Fixed(_, _)) => stack.push(FormatPart::Variable(
-                String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
+    unsafe {
+        for i in 0..bytes.len() {
+            let new_state = read_byte(&bytes[i], i, &state);
+            match (&state, &new_state) {
+                (Variable(start, end), Fixed(_, _)) => stack.push(FormatPart::Variable(
+                    str::from_utf8_unchecked(&bytes[*start..*end]),
+                )),
+                (Fixed(start, end), Variable(_, _)) => stack.push(FormatPart::Fixed(
+                    str::from_utf8_unchecked(&bytes[*start..*end]),
+                )),
+                _ => {}
+            };
+
+            state = new_state
+        }
+        match &state {
+            Variable(start, end) => stack.push(FormatPart::Variable(
+                str::from_utf8_unchecked(&bytes[*start..*end]),
             )),
-            (Fixed(start, end), Variable(_, _)) => stack.push(FormatPart::Fixed(
-                String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
+            Fixed(start, end) => stack.push(FormatPart::Fixed(
+                str::from_utf8_unchecked(&bytes[*start..*end]),
             )),
             _ => {}
         };
-
-        state = new_state
     }
-    match &state {
-        Variable(start, end) => stack.push(FormatPart::Variable(
-            String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
-        )),
-        Fixed(start, end) => stack.push(FormatPart::Fixed(
-            String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
-        )),
-        _ => {}
-    };
 
     Format::from_parts(stack)
 }
@@ -206,27 +192,27 @@ mod test {
         let format = Format::from_str(format_input).unwrap();
 
         assert_eq!(
-            Some(&Variable(String::from("$remote_addr"))),
+            Some(&Variable("$remote_addr")),
             format.parts.get(0)
         );
-        assert_eq!(Some(&Fixed(String::from(" - "))), format.parts.get(1));
+        assert_eq!(Some(&Fixed(" - ")), format.parts.get(1));
         assert_eq!(
-            Some(&Variable(String::from("$remote_user"))),
+            Some(&Variable("$remote_user")),
             format.parts.get(2)
         );
-        assert_eq!(Some(&Fixed(String::from(" ["))), format.parts.get(3));
+        assert_eq!(Some(&Fixed(" [")), format.parts.get(3));
         assert_eq!(
-            Some(&Variable(String::from("$time_local"))),
+            Some(&Variable("$time_local")),
             format.parts.get(4)
         );
-        assert_eq!(Some(&Fixed(String::from(r#"] ""#))), format.parts.get(5));
-        assert_eq!(Some(&Fixed(String::from(r#"] ""#))), format.parts.get(5));
+        assert_eq!(Some(&Fixed(r#"] ""#)), format.parts.get(5));
+        assert_eq!(Some(&Fixed(r#"] ""#)), format.parts.get(5));
         assert_eq!(
-            Some(&Variable(String::from("$request"))),
+            Some(&Variable("$request")),
             format.parts.get(6)
         );
-        assert_eq!(Some(&Fixed(String::from(r#"" ""#))), format.parts.get(15));
-        assert_eq!(Some(&Fixed(String::from(r#"""#))), format.parts.get(17));
+        assert_eq!(Some(&Fixed(r#"" ""#)), format.parts.get(15));
+        assert_eq!(Some(&Fixed(r#"""#)), format.parts.get(17));
     }
 
     #[test]
