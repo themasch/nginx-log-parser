@@ -1,10 +1,13 @@
 use regex::{escape, Captures, Error as RegexError, Regex};
-use std::str::FromStr;
+use std::str::{self, FromStr, Utf8Error};
 
 #[derive(Debug, Fail)]
 pub enum FormatParserError {
     #[fail(display = "compiling the regular expression failed: {}", inner)]
     CompilationFailed { inner: RegexError },
+
+    #[fail(display = "cannot convert bytes to string: {}", inner)]
+    StringConversionError { inner: Utf8Error },
 }
 
 /// a single entry/line in a log.
@@ -136,14 +139,14 @@ enum FormatParserState {
     Fixed(usize, usize),
 }
 
-fn is_var_char(char: &u8) -> bool {
+fn is_var_char(char: u8) -> bool {
     match char {
         b'a'...b'z' | b'A'...b'Z' | b'_' => true,
         _ => false,
     }
 }
 
-fn read_byte(chr: &u8, index: usize, state: &FormatParserState) -> FormatParserState {
+fn read_byte(chr: u8, index: usize, state: &FormatParserState) -> FormatParserState {
     use format::FormatParserState::*;
     match state {
         Start => match chr {
@@ -161,31 +164,35 @@ fn read_byte(chr: &u8, index: usize, state: &FormatParserState) -> FormatParserS
     }
 }
 
+fn create_owned_str(bytes: &[u8], start: usize, end: usize) -> Result<String, FormatParserError> {
+    str::from_utf8(&bytes[start..end])
+        .map(|res| res.to_owned())
+        .map_err(|err| FormatParserError::StringConversionError { inner: err })
+}
+
 fn read_format(bytes: &[u8]) -> Result<Format, FormatParserError> {
     use format::FormatParserState::*;
     let mut state = Start;
     let mut stack = vec![];
     for i in 0..bytes.len() {
-        let new_state = read_byte(&bytes[i], i, &state);
+        let new_state = read_byte(bytes[i], i, &state);
         match (&state, &new_state) {
             (Variable(start, end), Fixed(_, _)) => stack.push(FormatPart::Variable(
-                String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
+                create_owned_str(&bytes, *start, *end)?,
             )),
-            (Fixed(start, end), Variable(_, _)) => stack.push(FormatPart::Fixed(
-                String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
-            )),
+            (Fixed(start, end), Variable(_, _)) => {
+                stack.push(FormatPart::Fixed(create_owned_str(&bytes, *start, *end)?))
+            }
             _ => {}
         };
 
         state = new_state
     }
     match &state {
-        Variable(start, end) => stack.push(FormatPart::Variable(
-            String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
-        )),
-        Fixed(start, end) => stack.push(FormatPart::Fixed(
-            String::from_utf8(bytes[*start..*end].to_vec()).unwrap(),
-        )),
+        Variable(start, end) => stack.push(FormatPart::Variable(create_owned_str(
+            &bytes, *start, *end,
+        )?)),
+        Fixed(start, end) => stack.push(FormatPart::Fixed(create_owned_str(&bytes, *start, *end)?)),
         _ => {}
     };
 
