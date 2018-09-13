@@ -6,3 +6,13 @@ authors = ["Mark Schmale <m.schmale@uniorg.de>"]
 [dependencies]
 regex = "1.0.5"
 failure = "0.1.2"
+
+[dev-dependencies]
+criterion = "0.2"
+
+[[bench]]
+name = "bench"
+harness = false
+
+[profile.release]
+debug = true
