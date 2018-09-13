@@ -155,7 +155,7 @@ fn read_byte(chr: u8, index: usize, state: &FormatParserState) -> FormatParserSt
         },
         Variable(start, _end) => match chr {
             x if is_var_char(x) => Variable(*start, index + 1),
-            b'$' => Variable(index, index + 1),
+            b'$' => Variable(index + 1, index + 1),
             _ => Fixed(index, index + 1),
         },
         Fixed(start, _end) => match chr {
