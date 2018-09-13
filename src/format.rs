@@ -155,6 +155,7 @@ fn read_byte(chr: u8, index: usize, state: &FormatParserState) -> FormatParserSt
         },
         Variable(start, _end) => match chr {
             x if is_var_char(x) => Variable(*start, index + 1),
+            b'$' => Variable(index, index + 1),
             _ => Fixed(index, index + 1),
         },
         Fixed(start, _end) => match chr {
@@ -178,6 +179,9 @@ fn read_format(bytes: &[u8]) -> Result<Format, FormatParserError> {
         let new_state = read_byte(bytes[i], i, &state);
         match (&state, &new_state) {
             (Variable(start, end), Fixed(_, _)) => stack.push(FormatPart::Variable(
+                create_owned_str(&bytes, *start, *end)?,
+            )),
+            (Variable(start, end), Variable(b_start, _)) if b_start > start => stack.push(FormatPart::Variable(
                 create_owned_str(&bytes, *start, *end)?,
             )),
             (Fixed(start, end), Variable(_, _)) => {
