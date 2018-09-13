@@ -181,9 +181,9 @@ fn read_format(bytes: &[u8]) -> Result<Format, FormatParserError> {
             (Variable(start, end), Fixed(_, _)) => stack.push(FormatPart::Variable(
                 create_owned_str(&bytes, *start, *end)?,
             )),
-            (Variable(start, end), Variable(b_start, _)) if b_start > start => stack.push(FormatPart::Variable(
-                create_owned_str(&bytes, *start, *end)?,
-            )),
+            (Variable(start, end), Variable(b_start, _)) if b_start > start => stack.push(
+                FormatPart::Variable(create_owned_str(&bytes, *start, *end)?),
+            ),
             (Fixed(start, end), Variable(_, _)) => {
                 stack.push(FormatPart::Fixed(create_owned_str(&bytes, *start, *end)?))
             }
@@ -266,7 +266,13 @@ mod test {
         let format_input = "$remote_add$remote_user";
         let format = Format::from_str(format_input).unwrap();
 
-        assert_eq!(vec![Variable(String::from("remote_add")), Variable(String::from("remote_user"))], format.parts);
+        assert_eq!(
+            vec![
+                Variable(String::from("remote_add")),
+                Variable(String::from("remote_user")),
+            ],
+            format.parts
+        );
     }
 
     #[test]

@@ -8,9 +8,7 @@ use std::str::FromStr;
 
 fn format_parser_bench(c: &mut Criterion) {
     c.bench_function("short format", |b| {
-        b.iter(|| {
-            Format::from_str(r#"$remote_addr [$time_local] "$request" $status"#)
-        })
+        b.iter(|| Format::from_str(r#"$remote_addr [$time_local] "$request" $status"#))
     });
     c.bench_function("combined format", |b| {
         b.iter(|| {
