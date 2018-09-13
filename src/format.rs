@@ -121,10 +121,10 @@ impl FormatPart {
         match self {
             Variable(name) => format!(
                 "(?P<{}>{})",
-                name.trim_left_matches('$'),
+                name,
                 match name.as_str() {
-                    "$status" => "\\d{3}",
-                    "$body_bytes_sent" => "\\d+",
+                    "status" => "\\d{3}",
+                    "body_bytes_sent" => "\\d+",
                     _ => ".*",
                 }
             ),
@@ -150,7 +150,7 @@ fn read_byte(chr: u8, index: usize, state: &FormatParserState) -> FormatParserSt
     use format::FormatParserState::*;
     match state {
         Start => match chr {
-            b'$' => Variable(index, index + 1),
+            b'$' => Variable(index + 1, index + 1),
             _ => Fixed(index, index + 1),
         },
         Variable(start, _end) => match chr {
@@ -159,7 +159,7 @@ fn read_byte(chr: u8, index: usize, state: &FormatParserState) -> FormatParserSt
             _ => Fixed(index, index + 1),
         },
         Fixed(start, _end) => match chr {
-            b'$' => Variable(index, index + 1),
+            b'$' => Variable(index + 1, index + 1),
             _ => Fixed(*start, index + 1),
         },
     }
@@ -217,23 +217,23 @@ mod test {
         let format = Format::from_str(format_input).unwrap();
 
         assert_eq!(
-            Some(&Variable(String::from("$remote_addr"))),
+            Some(&Variable(String::from("remote_addr"))),
             format.parts.get(0)
         );
         assert_eq!(Some(&Fixed(String::from(" - "))), format.parts.get(1));
         assert_eq!(
-            Some(&Variable(String::from("$remote_user"))),
+            Some(&Variable(String::from("remote_user"))),
             format.parts.get(2)
         );
         assert_eq!(Some(&Fixed(String::from(" ["))), format.parts.get(3));
         assert_eq!(
-            Some(&Variable(String::from("$time_local"))),
+            Some(&Variable(String::from("time_local"))),
             format.parts.get(4)
         );
         assert_eq!(Some(&Fixed(String::from(r#"] ""#))), format.parts.get(5));
         assert_eq!(Some(&Fixed(String::from(r#"] ""#))), format.parts.get(5));
         assert_eq!(
-            Some(&Variable(String::from("$request"))),
+            Some(&Variable(String::from("request"))),
             format.parts.get(6)
         );
         assert_eq!(Some(&Fixed(String::from(r#"" ""#))), format.parts.get(15));
