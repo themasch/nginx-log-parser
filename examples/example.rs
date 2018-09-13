@@ -1,7 +1,6 @@
 extern crate nginx_log_parser;
 
 use nginx_log_parser::Format;
-use std::str::FromStr;
 
 fn main() {
     let lines = vec![
@@ -21,7 +20,7 @@ fn main() {
 
     let format_input = r#"$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent""#;
 
-    let format = Format::from_str(format_input).expect("cannot parse format: ");
+    let format = Format::new(format_input).expect("cannot parse format: ");
 
     for line in lines {
         match format.parse(line) {
