@@ -207,7 +207,7 @@ mod test {
     use std::str::FromStr;
 
     #[test]
-    fn test_parse_format() {
+    fn parse_format() {
         let format_input = r#"$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for""#;
 
         let format = Format::from_str(format_input).unwrap();
@@ -237,7 +237,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_main_format() {
+    fn parse_main_format_input() {
         let data = r#"192.0.2.139 - - [11/Sep/2018:13:45:22 +0000] "GET /favicon.ico HTTP/1.1" 404 142 "-" "python-requests/2.13.0""#;
         let format_input = r#"$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent""#;
         let format = Format::from_str(format_input).unwrap();
@@ -254,5 +254,22 @@ mod test {
             Some("python-requests/2.13.0"),
             result.get("http_user_agent")
         );
+    }
+
+    // this is a test case that we might do pretty bad at, not just in format parsing but in actual log parsing
+    #[test]
+    fn parse_corner_case() {
+        let format_input = "$remote_add$remote_user";
+        let format = Format::from_str(format_input).unwrap();
+
+        assert_eq!(vec![Variable(String::from("remote_add")), Variable(String::from("remote_user"))], format.parts);
+    }
+
+    #[test]
+    fn fails_to_parse_incorrect_input() {
+        let data = r#"this is not at all a valid input []"#;
+        let format_input = r#"$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent""#;
+        let format = Format::from_str(format_input).unwrap();
+        assert!(format.parse(data).is_none());
     }
 }
